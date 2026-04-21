@@ -1,0 +1,10 @@
+.venv/
+.env
+.streamlit/secrets.toml
+niftybot_ui_prefs.json
+niftybot_alerts.sqlite3
+niftybot_live_status.json
+__pycache__/
+*.pyc
+.Python
+*.log
