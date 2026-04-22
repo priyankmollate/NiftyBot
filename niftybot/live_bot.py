@@ -870,5 +870,5 @@ class QuoteORBRunner:
             time.sleep(self.poll_seconds)
 
 
-# Default live bot: same Session ORB v2 engine as historical backtest.
-ORBLiveBot = SessionORBLiveRunner
+# Default live bot uses Groww Live Data (`get_quote`) polling.
+ORBLiveBot = QuoteORBRunner

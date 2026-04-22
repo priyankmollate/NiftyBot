@@ -177,7 +177,7 @@ def main() -> None:
 
     pl = sub.add_parser(
         "live",
-        help="Session ORB v2 on closed 5m candles (same engine as backtest); optional quote-ORB via code",
+        help="Live ORB using Groww Live Data (`get_quote`) polling",
     )
     pl.add_argument(
         "--execute",
@@ -193,7 +193,7 @@ def main() -> None:
         "--poll",
         type=float,
         default=5.0,
-        help="Seconds between quote polls (default: 5)",
+        help="Seconds between live quote polls (default: 5)",
     )
     pl.set_defaults(func=cmd_live)
 

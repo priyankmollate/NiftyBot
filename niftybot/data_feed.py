@@ -3,8 +3,9 @@ from __future__ import annotations
 """
 Historical FNO candles for ORB backtests.
 
-Primary path follows Groww **Backtesting** docs (`get_historical_candles` + `groww_symbol`):
-https://groww.in/trade-api/docs/python-sdk/backtesting
+Primary path follows Groww **Historical Data** docs (`get_historical_candles`) with
+`groww_symbol` resolution from instruments:
+https://groww.in/trade-api/docs/python-sdk/historical-data
 
 `trading_symbol` (e.g. NIFTY26APRFUT or a fixed CE/PE) is resolved to `groww_symbol` via the instruments CSV.
 Falls back to deprecated `get_historical_candle_data` if the V2 call fails.
