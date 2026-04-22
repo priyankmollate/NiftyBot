@@ -125,6 +125,8 @@ class SessionORBLiveRunner:
     _engine_date: date | None = field(default=None, repr=False)
     _engine: SessionORBEngine | None = field(default=None, repr=False)
     _startup_telegram_sent: bool = field(default=False, repr=False)
+    _cached_hist_df: pd.DataFrame | None = field(default=None, repr=False)
+    _cached_hist_closed_bar_ts: pd.Timestamp | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         self.capital = self.settings.capital
@@ -277,6 +279,16 @@ class SessionORBLiveRunner:
                 )
 
     def _load_df_with_indicators(self) -> pd.DataFrame | None:
+        now_ts = pd.Timestamp.now(tz=IST)
+        latest_closed_bar_start = (now_ts.floor("5min") - pd.Timedelta(minutes=5)).tz_convert(IST)
+        if (
+            self._cached_hist_df is not None
+            and not self._cached_hist_df.empty
+            and self._cached_hist_closed_bar_ts is not None
+            and latest_closed_bar_start <= self._cached_hist_closed_bar_ts
+        ):
+            return self._cached_hist_df
+
         now = datetime.now(IST)
         start = datetime.combine((now - timedelta(days=self.warmup_days)).date(), datetime.min.time()).replace(
             tzinfo=IST
@@ -288,11 +300,15 @@ class SessionORBLiveRunner:
             end_time=now.strftime("%Y-%m-%d %H:%M:%S"),
         )
         if df.empty:
+            self._cached_hist_df = None
             return None
-        return compute_indicators(
+        out = compute_indicators(
             df,
             choppy_range_mean_max=self.settings.orb.choppy_range_mean_max,
         )
+        self._cached_hist_df = out
+        self._cached_hist_closed_bar_ts = latest_closed_bar_start
+        return out
 
     def _live_status_base(self) -> dict:
         return {

@@ -16,23 +16,38 @@ _AUTH_HINT = (
 
 
 def build_groww_client(settings: Settings) -> GrowwAPI:
+    return build_groww_client_from_auth(
+        api_key=settings.api_key,
+        api_secret=settings.api_secret,
+        totp=settings.totp,
+        totp_secret=settings.totp_secret,
+    )
+
+
+def build_groww_client_from_auth(
+    *,
+    api_key: str,
+    api_secret: str | None,
+    totp: str | None,
+    totp_secret: str | None,
+) -> GrowwAPI:
     try:
-        if settings.api_secret:
+        if api_secret:
             access_token = GrowwAPI.get_access_token(
-                api_key=settings.api_key,
-                secret=settings.api_secret,
+                api_key=api_key,
+                secret=api_secret,
             )
         else:
-            if settings.totp_secret:
-                totp = pyotp.TOTP(settings.totp_secret.strip()).now()
-            elif settings.totp:
-                totp = settings.totp.strip()
+            if totp_secret:
+                totp_code = pyotp.TOTP(totp_secret.strip()).now()
+            elif totp:
+                totp_code = totp.strip()
             else:
                 raise ValueError("TOTP flow needs GROWW_TOTP and/or GROWW_TOTP_SECRET.")
 
             access_token = GrowwAPI.get_access_token(
-                api_key=settings.api_key,
-                totp=totp,
+                api_key=api_key,
+                totp=totp_code,
             )
         return GrowwAPI(access_token)
     except GrowwAPIException as exc:

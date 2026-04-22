@@ -26,13 +26,43 @@ from niftybot.alerts_store import db_path, fetch_recent_alerts, record_alert
 from niftybot.live_status import read_live_status
 from niftybot.config import Settings, load_settings
 from niftybot.data_feed import fetch_historical_5m
-from niftybot.session import build_groww_client
+from niftybot.session import build_groww_client, build_groww_client_from_auth
 from niftybot.telegram_alerts import send_telegram_message, verify_telegram_bot_token
 from niftybot.ui_prefs import load_ui_prefs, save_ui_prefs
 
 _UI_IST = ZoneInfo("Asia/Kolkata")
 from niftybot.strategy import HighAccuracyORB
 from niftybot.tuner import grid_search_orb
+
+
+def _looks_like_rate_limit_error(err: Exception) -> bool:
+    txt = str(err).lower()
+    return ("rate limit" in txt) or ("too many requests" in txt) or ("429" in txt)
+
+
+@st.cache_data(ttl=20, show_spinner=False)
+def _cached_live_5m_data(
+    *,
+    symbol: str,
+    start_time: str,
+    end_time: str,
+    api_key: str,
+    api_secret: str | None,
+    totp: str | None,
+    totp_secret: str | None,
+) -> pd.DataFrame:
+    groww = build_groww_client_from_auth(
+        api_key=api_key,
+        api_secret=api_secret,
+        totp=totp,
+        totp_secret=totp_secret,
+    )
+    return fetch_historical_5m(
+        groww,
+        trading_symbol=symbol,
+        start_time=start_time,
+        end_time=end_time,
+    )
 
 
 def _mask_secret(s: str | None, *, keep: int = 4) -> str:
@@ -250,16 +280,25 @@ def _render_live_trading_chart(settings: Settings) -> None:
     session_start = datetime.combine(now.date(), datetime.min.time()).replace(hour=9, minute=15, tzinfo=_UI_IST)
     session_end = datetime.combine(now.date(), datetime.min.time()).replace(hour=15, minute=30, tzinfo=_UI_IST)
     try:
-        groww = build_groww_client(settings)
-        raw = fetch_historical_5m(
-            groww,
-            trading_symbol=settings.symbol,
+        raw = _cached_live_5m_data(
+            symbol=settings.symbol,
             start_time=session_start.strftime("%Y-%m-%d %H:%M:%S"),
             end_time=now.strftime("%Y-%m-%d %H:%M:%S"),
+            api_key=settings.api_key,
+            api_secret=settings.api_secret,
+            totp=settings.totp,
+            totp_secret=settings.totp_secret,
         )
     except Exception as e:  # noqa: BLE001
         with c_left:
             st.warning(f"Live chart data unavailable: {e}")
+            if _looks_like_rate_limit_error(e):
+                st.caption(
+                    "Groww API rate limit hit. Wait a short while, then retry. "
+                    "If using TOTP auth, `GROWW_API_KEY` must be your TOTP token (not regular API key), "
+                    "and use `GROWW_TOTP_SECRET`/fresh `GROWW_TOTP`; "
+                    "for API key auth use `GROWW_API_SECRET`."
+                )
         return
 
     if raw.empty:

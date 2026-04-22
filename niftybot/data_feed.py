@@ -75,14 +75,26 @@ def candles_v2_to_dataframe(response: dict) -> pd.DataFrame:
         if not isinstance(r, (list, tuple)) or len(r) < 6:
             continue
         ts, o, h, l, c, vol = r[0], r[1], r[2], r[3], r[4], r[5]
+        # Groww can occasionally return partial rows with None in OHLC fields.
+        # Skip those rows rather than failing the whole request/fallback path.
+        if ts is None or o is None or h is None or l is None or c is None:
+            continue
+        try:
+            o_f = float(o)
+            h_f = float(h)
+            l_f = float(l)
+            c_f = float(c)
+            vol_f = float(vol) if vol is not None else 0.0
+        except (TypeError, ValueError):
+            continue
         parsed.append(
             {
                 "timestamp": ts,
-                "open": float(o),
-                "high": float(h),
-                "low": float(l),
-                "close": float(c),
-                "volume": float(vol) if vol is not None else 0.0,
+                "open": o_f,
+                "high": h_f,
+                "low": l_f,
+                "close": c_f,
+                "volume": vol_f,
             }
         )
     if not parsed:
