@@ -279,11 +279,23 @@ def _render_live_trading_chart(settings: Settings) -> None:
     now = datetime.now(_UI_IST)
     session_start = datetime.combine(now.date(), datetime.min.time()).replace(hour=9, minute=15, tzinfo=_UI_IST)
     session_end = datetime.combine(now.date(), datetime.min.time()).replace(hour=15, minute=30, tzinfo=_UI_IST)
+    # Use the latest fully closed 5m bar as fetch end so cache keys stay stable between reruns.
+    now_ts = pd.Timestamp(now)
+    latest_closed_start = now_ts.floor("5min") - pd.Timedelta(minutes=5)
+    effective_end_ts = min(latest_closed_start, pd.Timestamp(session_end))
+    if effective_end_ts.tzinfo is None:
+        effective_end_ts = effective_end_ts.tz_localize(_UI_IST)
+    else:
+        effective_end_ts = effective_end_ts.tz_convert(_UI_IST)
+    if effective_end_ts <= pd.Timestamp(session_start):
+        with c_left:
+            st.info("Waiting for first closed 5m bar of the session.")
+        return
     try:
         raw = _cached_live_5m_data(
             symbol=settings.symbol,
             start_time=session_start.strftime("%Y-%m-%d %H:%M:%S"),
-            end_time=now.strftime("%Y-%m-%d %H:%M:%S"),
+            end_time=effective_end_ts.strftime("%Y-%m-%d %H:%M:%S"),
             api_key=settings.api_key,
             api_secret=settings.api_secret,
             totp=settings.totp,
